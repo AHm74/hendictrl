@@ -1,2 +1,2 @@
 # hendictrl
-Hendi pkugin for craftbeerpi3
+Hendi plugin for craftbeerpi3
