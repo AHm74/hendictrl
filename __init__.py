@@ -211,7 +211,7 @@ class ToBoilStep(StepBase):
         pass
 
 @cbpi.step
-class BoilStep(StepBase):
+class BoilStep_(StepBase):
     '''
     Just put the decorator @cbpi.step on top of a method
     '''
