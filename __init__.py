@@ -1,0 +1,172 @@
+import logging
+import time
+
+from modules import cbpi
+from modules.core.controller import KettleController
+from modules.core.props import Property
+from modules.core.hardware import ActorBase
+
+from modules.core.props import Property, StepProperty
+from modules.core.step import StepBase
+
+try:
+    import RPi.GPIO as GPIO
+
+    GPIO.setmode(GPIO.BCM)
+except Exception as e:
+    print
+    e
+    pass
+
+class PID(object):
+    ek_1 = 0.0
+    xk_1 = 0.0
+    xk_2 = 0.0
+
+    yk = 0.0
+
+    GMA_HLIM = 100.0
+    GMA_LLIM = 0.0
+
+    def __init__(self, ts, kc, ti, td, Pmax=100.0):
+        self.kc = kc
+        self.ti = ti
+        self.td = td
+        self.ts = ts
+        self.GMA_HLIM = Pmax
+        self.k0 = 0.0
+        self.k1 = 0.0
+        self.pp = 0.0
+        self.pi = 0.0
+        self.pd = 0.0
+
+        if (self.ti == 0.0):
+            self.k0 = 0.0
+        else:
+            self.k0 = self.kc * self.ts / self.ti
+        self.k1 = self.kc * self.td / self.ts
+
+    def calc(self, xk, tset):
+
+        ek = 0.0
+        ek = tset - xk # calculate e[k] = SP[k] - PV[k]
+
+        self.pp = self.kc * (self.xk_1 - xk) # y[k] = y[k-1] + Kc*(PV[k-1] - PV[k])
+        self.pi = self.k0 * ek  # + Kc*Ts/Ti * e[k]
+        self.pd = self.k1 * (2.0 * self.xk_1 - xk - self.xk_2)
+        self.yk += self.pp + self.pi + self.pd
+        print ("------------")
+        print (self.yk, self.pp, self.pi, self.pd)
+
+        self.xk_2 = self.xk_1  # PV[k-2] = PV[k-1]
+        self.xk_1 = xk    # PV[k-1] = PV[k]
+
+        # limit y[k] to GMA_HLIM and GMA_LLIM
+        if (self.yk > self.GMA_HLIM):
+            self.yk = self.GMA_HLIM
+        if (self.yk < self.GMA_LLIM):
+            self.yk = self.GMA_LLIM
+
+        return self.yk
+
+@cbpi.controller
+class PIDHendi(KettleController):
+
+    P = Property.Number("P", configurable=True, default_value=140, unit="")
+    I = Property.Number("I", configurable=True, default_value=40, unit="")
+    D = Property.Number("D", configurable=True, default_value=0, unit="")
+    Pmax = Property.Number("Max Power", configurable=True, default_value=100, unit="%")
+
+    def run(self):
+        p = float(self.P)
+        i = float(self.I)
+        d = float(self.D)
+        pmax = int(self.Pmax)
+        ts = 5
+
+        print (p, i, d, pmax)
+        pid = PID(ts, p, i, d, pmax)
+
+        while self.is_running():
+            heat_percent = pid.calc(self.get_sensor_value(), self.get_target_temp())
+            if heat_percent == 0:
+                self.actor_power(heat_percent)
+                self.heater_off()
+                print("PIDHendi heater off")
+            else:
+                self.heater_on(power=heat_percent)
+                self.actor_power(heat_percent)
+                print("PIDHendi calling heater_on(power={})".format(heat_percent))
+
+            self.sleep(ts)
+
+        self.heater_off()
+
+@cbpi.controller
+class BoilHendi(KettleController):
+
+    #Pmax = Property.Number("Max Power", configurable=True, default_value=100, unit="%")
+
+    def run(self):
+        pmax = int(self.Pmax)
+        ts = 5
+
+        while self.is_running():
+            #heat_percent = min(self.get_target_temp(), pmax)
+            heat_percent = self.get_target_temp()
+            if heat_percent == 0:
+                self.actor_power(heat_percent)
+                self.heater_off()
+            else:
+                self.heater_on(power=heat_percent)
+                self.actor_power(heat_percent)
+
+            self.sleep(ts)
+
+        self.heater_off()
+
+@cbpi.actor
+class HendiControl(ActorBase):
+    power_pin = Property.Select("Power control GPIO",
+                                options=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                                         20, 21, 22, 23, 24, 25, 26, 27], )
+    onoff_pin = Property.Select("On/Off control GPIO",
+                                options=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                                         20, 21, 22, 23, 24, 25, 26, 27])
+    freq = Property.Number("PWM frequency", configurable=True)
+    Pmax = Property.Number("Max Power", configurable=True, default_value=100, unit="%")
+
+    power = 0
+    pwm = None
+    stopped = True
+
+    def init(self):
+        GPIO.setmode(GPIO.BCM)
+        # setup pins for power control
+        GPIO.setup(int(self.power_pin), GPIO.OUT)
+        # setup pins for on/off control
+        GPIO.setup(int(self.onoff_pin), GPIO.OUT)
+        GPIO.output(int(self.onoff_pin), 0)
+
+    def on(self, power=None):
+        HendiControl.stopped = False
+        if HendiControl.pwm is None:
+            if HendiControl.freq is None:
+                HendiControl.freq = 100
+            HendiControl.pwm = GPIO.PWM(int(self.power_pin), int(self.freq))
+            HendiControl.pwm.start(int(HendiControl.power))
+        GPIO.output(int(self.onoff_pin), 1)
+        HendiControl.pwm.ChangeDutyCycle(int(HendiControl.power))
+
+    def set_power(self, power):
+        HendiControl.power = min(power, int(self.Pmax))
+        print("Set power {}".format(HendiControl.power))
+
+        self.pwm.ChangeDutyCycle(HendiControl.power)
+
+    def off(self):
+        cbpi.log_action("off")
+        self.stopped = True
+        self.pwm.ChangeDutyCycle(0)
+        GPIO.output(int(self.onoff_pin), 0)
+
