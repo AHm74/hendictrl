@@ -105,15 +105,13 @@ class PIDHendi(KettleController):
 @cbpi.controller
 class BoilHendi(KettleController):
 
-    #Pmax = Property.Number("Max Power", configurable=True, default_value=100, unit="%")
-
     def run(self):
-        pmax = int(self.Pmax)
         ts = 5
 
         while self.is_running():
             #heat_percent = min(self.get_target_temp(), pmax)
-            heat_percent = self.get_target_temp()
+            heat_percent = self.actor_power()
+            print("heat_percent = {}".format(heat_percent))
             if heat_percent == 0:
                 self.actor_power(heat_percent)
                 self.heater_off()
@@ -155,14 +153,18 @@ class HendiControl(ActorBase):
                 HendiControl.freq = 100
             HendiControl.pwm = GPIO.PWM(int(self.power_pin), int(self.freq))
             HendiControl.pwm.start(int(HendiControl.power))
-        GPIO.output(int(self.onoff_pin), 1)
+        if(0 == HendiControl.power):
+            GPIO.output(int(self.onoff_pin), 0)
+        else:
+            GPIO.output(int(self.onoff_pin), 1)
         HendiControl.pwm.ChangeDutyCycle(int(HendiControl.power))
 
     def set_power(self, power):
-        HendiControl.power = min(power, int(self.Pmax))
+        HendiControl.power = min(int(power), int(self.Pmax))
         print("Set power {}".format(HendiControl.power))
 
         self.pwm.ChangeDutyCycle(HendiControl.power)
+
 
     def off(self):
         cbpi.log_action("off")
@@ -211,12 +213,12 @@ class ToBoilStep(StepBase):
         pass
 
 @cbpi.step
-class PwrBoilStep_(StepBase):
+class BoilStep(StepBase):
     '''
     Just put the decorator @cbpi.step on top of a method
     '''
     # Properties
-    temp = Property.Number("Power", configurable=True)
+    power = Property.Number("Power", configurable=True)
     kettle = StepProperty.Kettle("Kettle")
     timer = Property.Number("Timer in Minutes", configurable=True)
 
@@ -226,7 +228,9 @@ class PwrBoilStep_(StepBase):
         :return:
         '''
         # set target tep
-        self.set_target_temp(self.temp, self.kettle)
+        print("class BoilStep(StepBase): power = {}".format(self.kettle))
+        self.actor_power(1, self.power)
+        #self.set_target_temp(self.power, self.kettle)
 
     @cbpi.action("Start Timer Now")
     def start(self):
@@ -240,9 +244,11 @@ class PwrBoilStep_(StepBase):
 
     def reset(self):
         self.stop_timer()
-        self.set_target_temp(self.temp, self.kettle)
+        self.actor_power(0, self.power)
+        #self.set_target_temp(self.temp, self.kettle)
 
     def finish(self):
+        self.actor_power(0, 0)
         self.set_target_temp(0, self.kettle)
 
     def execute(self):
