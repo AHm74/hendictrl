@@ -72,8 +72,8 @@ class PID(object):
 @cbpi.controller
 class PIDHendi(KettleController):
 
-    P = Property.Number("P", configurable=True, default_value=140, unit="")
-    I = Property.Number("I", configurable=True, default_value=40, unit="")
+    P = Property.Number("P", configurable=True, default_value=40, unit="")
+    I = Property.Number("I", configurable=True, default_value=140, unit="")
     D = Property.Number("D", configurable=True, default_value=0, unit="")
     Pmax = Property.Number("Max Power", configurable=True, default_value=100, unit="%")
 
