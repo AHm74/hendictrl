@@ -20,8 +20,8 @@ Download via CraftBeerPi Web Interface and restart CraftBeerPi.
     1. select "Agitator" if applicable 
     1. select "Sensor" -> mash temperature (or the name choosen i §2)   
     1. configure "D" to 0 (or a suitable value for your equipment)
-    1. configure "I" to 40 (or a suitable value for your equipment)
-    1. configure "P" to 140 (or a suitable value for your equipment)
+    1. configure "I" to 140 (or a suitable value for your equipment)
+    1. configure "P" to 40 (or a suitable value for your equipment)
     1. configure "Max Power" to 100, will be evaluated and might disapear in the future
 1.  Create a (boil)kettle for power control, for example "Boil"
     1. select "Logic" -> BoilHendi
