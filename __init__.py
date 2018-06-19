@@ -92,11 +92,12 @@ class PIDHendi(KettleController):
             if heat_percent == 0:
                 self.actor_power(heat_percent)
                 self.heater_off()
-                print("PIDHendi heater off")
+                cbpi.log_action("PIDHendi OFF {}")
             else:
-                self.heater_on(power=heat_percent)
                 self.actor_power(heat_percent)
-                print("PIDHendi calling heater_on(power={})".format(heat_percent))
+                self.heater_on(power=heat_percent)
+
+                cbpi.log_action("PIDHendi calling heater_on(power={})".format(heat_percent))
 
             self.sleep(ts)
 
@@ -145,6 +146,7 @@ class HendiControl(ActorBase):
         # setup pins for on/off control
         GPIO.setup(int(self.onoff_pin), GPIO.OUT)
         GPIO.output(int(self.onoff_pin), 0)
+        HendiControl.power =  int(self.Pmax)
 
     def on(self, power=None):
         HendiControl.stopped = False
@@ -157,19 +159,22 @@ class HendiControl(ActorBase):
             GPIO.output(int(self.onoff_pin), 0)
         else:
             GPIO.output(int(self.onoff_pin), 1)
-        HendiControl.pwm.ChangeDutyCycle(int(HendiControl.power))
+            HendiControl.pwm.start(1)
+            HendiControl.pwm.ChangeDutyCycle(int(HendiControl.power))
+            cbpi.log_action("ON, Set power {}".format(HendiControl.power))
 
     def set_power(self, power):
         HendiControl.power = min(int(power), int(self.Pmax))
-        print("Set power {}".format(HendiControl.power))
-
+        cbpi.log_action("Set power {}".format(HendiControl.power))
         self.pwm.ChangeDutyCycle(HendiControl.power)
+
 
 
     def off(self):
         cbpi.log_action("off")
         self.stopped = True
         self.pwm.ChangeDutyCycle(0)
+        self.pwm.stop()
         GPIO.output(int(self.onoff_pin), 0)
 
 @cbpi.step
