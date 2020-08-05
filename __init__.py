@@ -14,7 +14,7 @@ try:
 
     GPIO.setmode(GPIO.BCM)
 except Exception as e:
-    print
+    print()
     e
     pass
 
@@ -56,7 +56,7 @@ class PID(object):
         self.pd = self.k1 * (2.0 * self.xk_1 - xk - self.xk_2)
         self.yk += self.pp + self.pi + self.pd
         print ("------------")
-        print (self.yk, self.pp, self.pi, self.pd)
+        print((self.yk, self.pp, self.pi, self.pd))
 
         self.xk_2 = self.xk_1  # PV[k-2] = PV[k-1]
         self.xk_1 = xk    # PV[k-1] = PV[k]
@@ -84,7 +84,7 @@ class PIDHendi(KettleController):
         pmax = int(self.Pmax)
         ts = 5
 
-        print (p, i, d, pmax)
+        print((p, i, d, pmax))
         pid = PID(ts, p, i, d, pmax)
 
         while self.is_running():
@@ -112,7 +112,7 @@ class BoilHendi(KettleController):
         while self.is_running():
             #heat_percent = min(self.get_target_temp(), pmax)
             heat_percent = self.actor_power()
-            print("heat_percent = {}".format(heat_percent))
+            print(("heat_percent = {}".format(heat_percent)))
             if heat_percent == 0:
                 self.actor_power(heat_percent)
                 self.heater_off()
@@ -194,7 +194,7 @@ class ToBoilStep(StepBase):
         '''
         # set target tep
         self.s = False
-        print("ToBoilStep init: {}".format(int(self.temp)))
+        print(("ToBoilStep init: {}".format(int(self.temp))))
         self.set_target_temp(self.temp, self.kettle)
 
     def reset(self):
@@ -233,7 +233,7 @@ class BoilStep(StepBase):
         :return:
         '''
         # set target tep
-        print("class BoilStep(StepBase): power = {}".format(self.kettle))
+        print(("class BoilStep(StepBase): power = {}".format(self.kettle)))
         self.actor_power(1, self.power)
         #self.set_target_temp(self.power, self.kettle)
 
@@ -268,4 +268,4 @@ class BoilStep(StepBase):
 
         # Check if timer finished and go to next step
         if self.is_timer_finished() == True:
-            self.next()
+            next(self)
